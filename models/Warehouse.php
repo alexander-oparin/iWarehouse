@@ -6,7 +6,6 @@ use yii\base\Exception;
 use yii\web\BadRequestHttpException;
 
 class Warehouse implements WarehouseInterface {
-
     /**
      * @param $value
      * @return bool
@@ -28,8 +27,6 @@ class Warehouse implements WarehouseInterface {
     /**
      * @param string $request
      * @return array|string
-     * @throws \Exception
-     * @throws \Throwable
      * @throws \yii\db\Exception
      */
     public function load($request) {
@@ -59,17 +56,22 @@ class Warehouse implements WarehouseInterface {
         return ['timestamp' => $timestamp];
     }
 
-
+    /**
+     * @param $request
+     * @return array|string
+     * @throws \yii\db\Exception
+     */
     public function ship($request) {
         $transaction = Yii::$app->db->beginTransaction();
+        $timestamp = intval(microtime(true) * 1000000);
+        $goods = [];
+        $notEnoughGoods = [];
+        $status = '';
 
         try {
             if (!isset($request['goods']) || !count($request['goods'])) {
                 throw new BadRequestHttpException('Некорректные данные', 400);
             }
-
-            $timestamp = intval(microtime(true) * 1000000);
-            $goods = [];
 
             foreach ($request['goods'] as $good_id => $quantity) {
                 if (!self::validateData($good_id) || !self::validateData($quantity)) {
@@ -80,11 +82,9 @@ class Warehouse implements WarehouseInterface {
                 if ($countGood < $quantity) {
                     $transaction->rollBack();
 
-                    $response = ['timestamp' => $timestamp];
-                    $response['status'] = 'not shipped';
-                    $response['notEnoughGoods'] = [$good_id => $quantity - $countGood];
+                    $status = self::WH_STATUS_NOT_SHIPPED;
+                    $notEnoughGoods[$good_id] = $quantity - $countGood;
 
-                    return $response;
                 } else {
                     $goods[$good_id] = Part::takeGood($good_id, $quantity);
                 }
@@ -95,7 +95,12 @@ class Warehouse implements WarehouseInterface {
             return $e->getMessage();
         }
 
-        $transaction->commit();
-        return ['timestamp' => $timestamp, 'status' => 'shipped', 'goods' => $goods];
+        if ($status == self::WH_STATUS_NOT_SHIPPED) {
+            $transaction->rollBack();
+            return ['timestamp' => $timestamp, 'status' => self::WH_STATUS_NOT_SHIPPED, 'notEnoughGoods' => $notEnoughGoods];
+        } else {
+            $transaction->commit();
+            return ['timestamp' => $timestamp, 'status' => self::WH_STATUS_SHIPPED, 'goods' => $goods];
+        }
     }
 }

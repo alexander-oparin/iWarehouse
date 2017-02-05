@@ -2,6 +2,8 @@
 namespace app\models;
 
 interface WarehouseInterface {
+    const WH_STATUS_SHIPPED = 'shipped';
+    const WH_STATUS_NOT_SHIPPED = 'not shipped';
 
     /**
      * @param string $request

@@ -49,7 +49,6 @@ function WarehouseCtrl($scope, $http) {
         $http.post('/warehouse/' + scope.action, {
             goods: scope.parts
         }).then(function (data) {
-            console.log(data);
             if (data.status == 200) {
                 scope.results.push(data.data);
                 $('.result-filled').removeClass('hidden');
